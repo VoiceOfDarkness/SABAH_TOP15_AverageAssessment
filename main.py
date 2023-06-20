@@ -28,7 +28,7 @@ class Data(StatesGroup):
 @data_router.message(Command('start'))
 async def start(message: types.Message, state: FSMContext):
     await state.set_state(Data.means_credit)
-    await message.reply("Введите значения для means_kredit через запятую:")
+    await message.reply("kreditləri vergül ilə əlavə edin")
 
 
 @data_router.message(Data.means_credit)
@@ -37,9 +37,9 @@ async def process_means_kredit(message: types.Message, state: FSMContext):
         means_kredit = [int(num.strip()) for num in message.text.split(",")]
         await state.update_data(means_kredit=means_kredit)
         await state.set_state(Data.ratings)
-        await message.reply('Введите значения для оценок')
+        await message.reply('qiymətləri vergül ilə əlavə edin')
     except ValueError:
-        await message.reply('Ошибка! Пожалуйста, введите числовые значения через запятую.')
+        await message.reply('məlumatların düzgünlüyünu bir daha yoxlaın')
 
 
 @data_router.message(Data.ratings)
@@ -55,10 +55,10 @@ async def set_ratings(message: types.Message, state: FSMContext):
         rows = [ratings[i:i + credits] for i in range(0, len(ratings), credits)]
 
         await state.update_data(ratings=rows)
-        await message.reply("Данные оценок записаны! идет рассчет")
+        await message.reply("Qiymətlər Əlavə edildi. Hesablama")
         await calculate(message=message, state=state)
     except ValueError:
-        await message.reply('Ошибка! Пожалуйста, введите числовые значения для оценок через запятую.')
+        await message.reply('məlumatların düzgünlüyünu bir daha yoxlaın')
 
 
 @data_router.message(Data.results)
@@ -124,9 +124,9 @@ async def calculate(message: types.Message, state: FSMContext):
 
             await message.answer(response)
         else:
-            await message.reply("Пожалуйста, установите значения для means_kredit, ratings и names.")
+            await message.reply("Lütfən, vasitələrin_krediti, reytinqlər və adlar üçün dəyərlər təyin edin.")
     except Exception as e:
-        await message.reply(f"Ошибка при выполнении расчета: {e}")
+        await message.reply(f"Hesablama zamanı xəta: {e}")
 
 
 async def main():
