@@ -1,0 +1,5 @@
+# Telegram bot files to ignore
+*.pyc
+*.log
+.env
+__pycache__/
