@@ -2,8 +2,10 @@ import logging
 import sys
 import os
 import asyncio
-from dotenv import load_dotenv
 
+from uuid import uuid1
+from dotenv import load_dotenv
+from pymongo.mongo_client import MongoClient
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -13,14 +15,31 @@ from aiogram.filters import Command
 # Получение значения переменной окружения
 load_dotenv()
 
+username = os.getenv('DB_USERNAME')
+password = os.getenv('DB_PASSWORD')
 token = os.getenv('TELEGRAM_TOKEN')
 
+# Остальной код...
+cluster = MongoClient(f"mongodb+srv://{username}:{password}@database.iirfppa.mongodb.net/?retryWrites=true&w=majority")
+
+db = cluster['TOP15']
+collection = db['telegrambot']
+
 data_router = Router()
+
+
+async def add_data(student_ratings, student_name):
+    collection.insert_one({
+        '_id': str(uuid1()),
+        "ratings": student_ratings,
+        "name": student_name,
+    })
 
 
 class Data(StatesGroup):
     means_credit = State()
     ratings = State()
+    names = State()
     results = State()
 
 
@@ -41,62 +60,45 @@ async def process_means_kredit(message: types.Message, state: FSMContext):
 
 @data_router.message(Data.ratings)
 async def set_ratings(message: types.Message, state: FSMContext):
-    await state.set_state(Data.results)
+    await state.set_state(Data.names)
     ratings = [int(num.strip()) for num in message.text.split(",")]
     data = await state.get_data()
     means_credit = data.get('means_kredit')
     credits = len(means_credit)
 
     # Разбиваем оценки на строки (ряды) по количеству кредитов
-    rows = [ratings[i:i+credits] for i in range(0, len(ratings), credits)]
+    # rows = [ratings[i:i+credits] for i in range(0, len(ratings), credits)]
+    for i in range(0, len(ratings), credits):
+        rows = ratings[i:i+credits]
 
     await state.update_data(ratings=rows)
+    await message.reply("Adinizi əlavə edin")
+
+
+@data_router.message(Data.names)
+async def set_names(message: types.Message, state: FSMContext):
+    await state.set_state(Data.results)
+    await state.update_data(names=message.text)
+    data = await state.get_data()
+    await add_data(data.get('ratings'), message.text)
     await message.reply("Qiymətləndirmə məlumatları qeyd edildi! hesablama aparılır")
     await calculate(message=message, state=state)
+
 
 @data_router.message(Data.results)
 async def calculate(message: types.Message, state: FSMContext):
     data = await state.get_data()
     means_kredit = data.get("means_kredit", [])
-    ratings = data.get("ratings", [])
-    names = {
-        1: "leyla",
-        2: "murad",
-        3: "adil",
-        4: "samir",
-        5: "nihad",
-        6: "teymur",
-        7: "nurane",
-        8: "maga",
-        9: "semender",
-        10: "yaqut",
-        11: "aysu",
-        12: "abil",
-        13: "ramin",
-        14: "ehmed",
-        15: "qabil",
-        16: "ibrahim",
-        17: "xaliq",
-        18: "kanan",
-        19: "rovlan",
-        20: "subhan",
-        21: "ferid(buludlu)",
-        22: "sefer",
-        23: "aqil",
-        24: "esli",
-        25: "ferid(memmedzade)",
-        26: "ismayil",
-        27: "alpay",
-        28: "aysel",
-        29: "rufet"
-    }
+    cursor_ratings = collection.find({}, {"ratings": 1})
+    cursor_names = collection.find({}, {"name": 1})
+    ratings = [doc["ratings"] for doc in cursor_ratings]
+    names = {i + 1: doc["name"] for i, doc in enumerate(cursor_names)}
 
     if means_kredit and ratings:
-        # Ваш код для расчета и вывода рейтингов
         lst = []
         result = [[rating[i] * means_kredit[i]
-                   for i in range(len(rating))] for rating in ratings]
-        
+                for i in range(len(rating))] for rating in ratings]
+
         data_names = dict(zip(names.values(), ratings))
 
         for name in names.values():
