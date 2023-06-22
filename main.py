@@ -3,14 +3,12 @@ import sys
 import os
 import asyncio
 
-from uuid import uuid1
 from dotenv import load_dotenv
 from pymongo.mongo_client import MongoClient
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command
-
 
 # Получение значения переменной окружения
 load_dotenv()
@@ -28,12 +26,12 @@ collection = db['telegrambot']
 data_router = Router()
 
 
-async def add_data(student_ratings, student_name):
-    collection.insert_one({
-        '_id': str(uuid1()),
-        "ratings": student_ratings,
-        "name": student_name,
-    })
+async def add_data(student_id, student_ratings, student_name):
+    collection.find_one_and_update(
+        {'_id': student_id},
+        {'$set': {"ratings": student_ratings, "name": student_name}},
+        upsert=True
+    )
 
 
 class Data(StatesGroup):
@@ -80,7 +78,7 @@ async def set_names(message: types.Message, state: FSMContext):
     await state.set_state(Data.results)
     await state.update_data(names=message.text)
     data = await state.get_data()
-    await add_data(data.get('ratings'), message.text)
+    await add_data(message.from_user.id, data.get('ratings'), data.get('names'))
     await message.reply("Qiymətləndirmə məlumatları qeyd edildi! hesablama aparılır")
     await calculate(message=message, state=state)
 
@@ -88,7 +86,8 @@ async def set_names(message: types.Message, state: FSMContext):
 @data_router.message(Data.results)
 async def calculate(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    means_kredit = data.get("means_kredit", [])
+    means_kredit = data.get("means_kredit")
+    
     cursor_ratings = collection.find({}, {"ratings": 1})
     cursor_names = collection.find({}, {"name": 1})
     ratings = [doc["ratings"] for doc in cursor_ratings]
