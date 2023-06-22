@@ -27,10 +27,10 @@ collection = db['telegrambot']
 data_router = Router()
 
 
-async def add_data(student_id, student_ratings, student_name):
+async def add_data(student_id, subjects_credits, student_ratings, student_name):
     collection.find_one_and_update(
         {'_id': student_id},
-        {'$set': {"ratings": student_ratings, "name": student_name}},
+        {'$set': {"subjects_credits": subjects_credits, "ratings": student_ratings, "name": student_name}},
         upsert=True
     )
 
@@ -46,19 +46,40 @@ class Data(StatesGroup):
     ratings = State()
     names = State()
     delete = State()
+    top_list = State()
 
 
 # Команда /start
 @data_router.message(Command('start'))
 async def start(message: types.Message, state: FSMContext):
-    await state.set_state(Data.delete)    
-    await message.answer("movcud olan melumatinizi silmek isteyirsiz?", reply_markup=ReplyKeyboardMarkup(keyboard=[
+    await state.set_state(Data.top_list)    
+    await message.answer("movcud olan TOP15 baxmaq isteyirsiz?", reply_markup=ReplyKeyboardMarkup(keyboard=[
         [
             KeyboardButton(text='Hə'),
             KeyboardButton(text='Xeyir'),
             
         ]
     ], resize_keyboard=True))
+
+
+@data_router.message(Data.top_list)
+async def top_list(message: types.Message, state: FSMContext):
+    user_response = message.text
+    try:
+        if user_response == 'Hə':
+            await calculate(message=message, state=state)
+        else:
+            await state.set_state(Data.delete)
+            await message.answer("movcud olan melumatinizi silmek isteyirsiz?", reply_markup=ReplyKeyboardMarkup(keyboard=[
+                [
+                    KeyboardButton(text='Hə'),
+                    KeyboardButton(text='Xeyir'),
+                    
+                ]
+            ], resize_keyboard=True))
+    except:
+        await message.answer('TOP15 siyahisi bosdur')
+    
 
 
 @data_router.message(Data.delete)
@@ -77,10 +98,10 @@ async def delete_data(message: types.Message, state: FSMContext):
 
 @data_router.message(Data.means_credit)
 async def process_means_kredit(message: types.Message, state: FSMContext):
-    means_kredit = [int(num.strip()) for num in message.text.split(",")]       
-    await state.update_data(means_kredit=means_kredit)
+    means_kredit = [int(num.strip()) for num in message.text.split(",")]
+    await state.update_data(means_credit=means_kredit)
     await state.set_state(Data.ratings)
-    await message.reply('Qiymətlər üçün dəyərlər daxil edin')
+    await message.answer('Qiymətlər üçün dəyərlər daxil edin')
 
 
 @data_router.message(Data.ratings)
@@ -88,7 +109,7 @@ async def set_ratings(message: types.Message, state: FSMContext):
     await state.set_state(Data.names)
     ratings = [int(num.strip()) for num in message.text.split(",")]
     data = await state.get_data()
-    means_credit = data.get('means_kredit')
+    means_credit = data.get('means_credit')
     credits = len(means_credit)
 
     # Разбиваем оценки на строки (ряды) по количеству кредитов
@@ -97,24 +118,25 @@ async def set_ratings(message: types.Message, state: FSMContext):
         rows = ratings[i:i+credits]
 
     await state.update_data(ratings=rows)
-    await message.reply("Adinizi əlavə edin")
+    await message.answer("Adinizi əlavə edin")
 
 
 @data_router.message(Data.names)
 async def set_names(message: types.Message, state: FSMContext):
     await state.update_data(names=message.text)
     data = await state.get_data()
-    await add_data(message.from_user.id, data.get('ratings'), data.get('names'))
+    await add_data(message.from_user.id, data.get('means_credit'), data.get('ratings'), data.get('names'))
     await message.reply("Qiymətləndirmə məlumatları qeyd edildi! hesablama aparılır")
     await calculate(message=message, state=state)
 
 
 async def calculate(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    means_kredit = data.get("means_kredit")
-    
+    cursor_credits = collection.find({}, {"subjects_credits": 1})
     cursor_ratings = collection.find({}, {"ratings": 1})
     cursor_names = collection.find({}, {"name": 1})
+    for doc in cursor_credits:
+        means_kredit = doc["subjects_credits"]
     ratings = [doc["ratings"] for doc in cursor_ratings]
     names = {i + 1: doc["name"] for i, doc in enumerate(cursor_names)}
 
