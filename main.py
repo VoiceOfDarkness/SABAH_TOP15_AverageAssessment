@@ -1,14 +1,15 @@
-import logging
-import sys
-import os
 import asyncio
+import logging
+import os
+import sys
 
-from dotenv import load_dotenv
-from pymongo.mongo_client import MongoClient
-from aiogram import Bot, Dispatcher, types, Router
+from aiogram import Bot, Dispatcher, F, Router, types
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.filters import Command
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from dotenv import load_dotenv
+from pymongo.mongo_client import MongoClient
 
 # Получение значения переменной окружения
 load_dotenv()
@@ -34,19 +35,45 @@ async def add_data(student_id, student_ratings, student_name):
     )
 
 
+async def delete_student_data(student_id):
+    collection.find_one_and_delete(
+        {'_id': student_id}
+    )
+
+
 class Data(StatesGroup):
     means_credit = State()
     ratings = State()
     names = State()
-    results = State()
+    delete = State()
 
 
 # Команда /start
 @data_router.message(Command('start'))
 async def start(message: types.Message, state: FSMContext):
-    await state.set_state(Data.means_credit)    
-    await message.reply("Vergüllə ayrılmış kreditlər üçün dəyərləri daxil edin:")
+    await state.set_state(Data.delete)    
+    await message.answer("movcud olan melumatinizi silmek isteyirsiz?", reply_markup=ReplyKeyboardMarkup(keyboard=[
+        [
+            KeyboardButton(text='Hə'),
+            KeyboardButton(text='Xeyir'),
+            
+        ]
+    ], resize_keyboard=True))
 
+
+@data_router.message(Data.delete)
+async def delete_data(message: types.Message, state: FSMContext):
+    user_response = message.text
+    try:
+        if user_response == 'Hə':
+            await delete_student_data(message.from_user.id)
+            await message.reply('Məlumtlariniz uğurla silindi')
+        else:
+            await state.set_state(Data.means_credit)
+            await message.reply('Kreditləri vergül ilə daxil edin')
+    except:
+        await message.reply('Sizin haqqında məlumat yoxdur')
+    
 
 @data_router.message(Data.means_credit)
 async def process_means_kredit(message: types.Message, state: FSMContext):
@@ -75,7 +102,6 @@ async def set_ratings(message: types.Message, state: FSMContext):
 
 @data_router.message(Data.names)
 async def set_names(message: types.Message, state: FSMContext):
-    await state.set_state(Data.results)
     await state.update_data(names=message.text)
     data = await state.get_data()
     await add_data(message.from_user.id, data.get('ratings'), data.get('names'))
@@ -83,7 +109,6 @@ async def set_names(message: types.Message, state: FSMContext):
     await calculate(message=message, state=state)
 
 
-@data_router.message(Data.results)
 async def calculate(message: types.Message, state: FSMContext):
     data = await state.get_data()
     means_kredit = data.get("means_kredit")
