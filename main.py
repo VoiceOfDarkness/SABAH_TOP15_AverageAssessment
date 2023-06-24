@@ -55,8 +55,8 @@ async def start(message: types.Message, state: FSMContext):
     await state.set_state(Data.top_list)    
     await message.answer("movcud olan TOP15 baxmaq isteyirsiz?", reply_markup=ReplyKeyboardMarkup(keyboard=[
         [
-            KeyboardButton(text='Hə'),
-            KeyboardButton(text='Xeyir'),
+            KeyboardButton(text='Bəli'),
+            KeyboardButton(text='Xeyr'),
             
         ]
     ], resize_keyboard=True))
@@ -66,14 +66,14 @@ async def start(message: types.Message, state: FSMContext):
 async def top_list(message: types.Message, state: FSMContext):
     user_response = message.text
     try:
-        if user_response == 'Hə':
+        if user_response == 'Bəli':
             await calculate(message=message, state=state)
         else:
             await state.set_state(Data.delete)
             await message.answer("movcud olan melumatinizi silmek isteyirsiz?", reply_markup=ReplyKeyboardMarkup(keyboard=[
                 [
-                    KeyboardButton(text='Hə'),
-                    KeyboardButton(text='Xeyir'),
+                    KeyboardButton(text='Bəli'),
+                    KeyboardButton(text='Xeyr'),
                     
                 ]
             ], resize_keyboard=True))
@@ -86,7 +86,7 @@ async def top_list(message: types.Message, state: FSMContext):
 async def delete_data(message: types.Message, state: FSMContext):
     user_response = message.text
     try:
-        if user_response == 'Hə':
+        if user_response == 'Bəli':
             await delete_student_data(message.from_user.id)
             await message.reply('Məlumtlariniz uğurla silindi')
         else:
